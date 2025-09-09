@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Facebook ID Finder",
+  "version": "1.4",
+  "description": "Find Facebook IDs from phone numbers with multi-tab support",
+  "permissions": ["activeTab", "storage", "scripting", "tabs"],
+  "host_permissions": ["https://docs.google.com/", "https://*.facebook.com/"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Find FB IDs"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.facebook.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png"
+  },
+  "web_accessible_resources": [{
+    "resources": ["icons/*"],
+    "matches": ["https://*.facebook.com/*"]
+  }]
+}
