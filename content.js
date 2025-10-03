@@ -1,87 +1,87 @@
-// User agents list for rotation (50+ user agents)
-const userAgents = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36',
-  // Add more user agents as needed (total 50+)
-];
-
-// Get a random user agent
-function getRandomUserAgent() {
-  return userAgents[Math.floor(Math.random() * userAgents.length)];
-}
-
-// Set random user agent when script loads
-if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
-  Object.defineProperty(navigator, 'userAgent', {
-    get: function() { return getRandomUserAgent(); },
-    configurable: true
-  });
-}
-
-// Check if URL contains a phone number parameter
-function checkUrlForPhoneNumber() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const phoneNumber = urlParams.get('email');
-  
-  if (phoneNumber) {
-    // Mark this number as used
-    chrome.runtime.sendMessage({
-      action: 'updateResults',
-      used: [phoneNumber],
-      found: []
-    });
-    
-    // Update status
-    chrome.runtime.sendMessage({
-      action: 'updateStatus',
-      message: `Number ${phoneNumber} found in URL, marked as used`,
-      isError: false
-    });
-    
-    return true;
-  }
-  
-  return false;
-}
-
-// Listen for messages from popup
+// Listen for messages from popup and background
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === 'startProcess') {
-    // Check if URL already contains a phone number before starting process
-    if (!checkUrlForPhoneNumber()) {
-      startProcess(request.number, request.delay);
-    }
+    startProcess(request.numbers, request.tabIndex, request.delayTime);
     sendResponse({received: true});
   } else if (request.action === 'stopProcess') {
     isStopped = true;
+    sendResponse({received: true});
+  } else if (request.action === 'updateUsedNumbers') {
+    updateUsedNumbers(request.usedNumbers);
     sendResponse({received: true});
   }
   return true;
 });
 
 let isStopped = false;
+let currentNumbers = [];
+let usedNumbers = [];
+let tabIndex = 0;
+let delayTime = 2500;
 
-function startProcess(number, delay = 3000) {
+// Update used numbers list every 500ms from background
+setInterval(() => {
+  chrome.runtime.sendMessage({
+    action: 'getUsedNumbers'
+  }, function(response) {
+    if (response && response.usedNumbers) {
+      usedNumbers = response.usedNumbers;
+    }
+  });
+}, 500);
+
+function startProcess(numbers, index, delay) {
+  currentNumbers = [...numbers]; // Create a copy
+  tabIndex = index || 0;
   isStopped = false;
-  let processDelay = delay;
+  delayTime = delay || 2500;
   
-  // Update status
-  updateStatus(`Processing: ${number}`);
+  // Add 1-second delay between tabs
+  const tabDelay = tabIndex * 1000;
   
-  // Check if we should process this number
-  if (isStopped) {
-    updateStatus('Process stopped');
-    chrome.runtime.sendMessage({
-      action: 'processCompleted'
-    });
+  setTimeout(() => {
+    // Start processing
+    processNext();
+  }, tabDelay);
+}
+
+// Update used numbers list
+function updateUsedNumbers(newUsedNumbers) {
+  usedNumbers = newUsedNumbers;
+}
+
+// Function to process next number
+function processNext() {
+  if (isStopped || currentNumbers.length === 0) {
+    finishProcess();
+    return;
+  }
+  
+  // Filter out used numbers from current numbers
+  const availableNumbers = currentNumbers.filter(num => !usedNumbers.includes(num));
+  
+  if (availableNumbers.length === 0) {
+    finishProcess();
+    return;
+  }
+  
+  // Get a random number from the available list
+  const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+  const currentNumber = availableNumbers[randomIndex];
+  
+  // Remove the number from the local list
+  const numberIndex = currentNumbers.indexOf(currentNumber);
+  if (numberIndex > -1) {
+    currentNumbers.splice(numberIndex, 1);
+  }
+  
+  updateStatus(`Tab ${tabIndex + 1}: Checking ${currentNumber}`);
+  
+  // Check if we're on the correct page
+  if (!window.location.href.includes('facebook.com/login/identify')) {
+    updateStatus(`Tab ${tabIndex + 1}: Wrong page, redirecting...`);
+    window.location.href = 'https://www.facebook.com/login/identify/?ctx=recover';
+    setTimeout(() => processNext(), 3000);
     return;
   }
   
@@ -90,77 +90,117 @@ function startProcess(number, delay = 3000) {
   const submitButton = document.querySelector('button[type="submit"]');
   
   if (!emailInput || !submitButton) {
-    updateStatus('Facebook elements not found!', true);
-    isStopped = true;
-    finishProcess();
+    updateStatus(`Tab ${tabIndex + 1}: Form elements not found, retrying...`);
+    setTimeout(() => processNext(), 2000);
     return;
   }
   
-  // Clear input using copy-paste method (more reliable than typing simulation)
+  // Clear input and enter number
+  emailInput.value = '';
   emailInput.focus();
-  emailInput.select();
-  document.execCommand('paste');
+  document.execCommand('insertText', false, currentNumber);
   
+  // Submit form after 2.5 seconds delay
   setTimeout(() => {
-    // Set value directly (copy-paste method)
-    emailInput.value = number;
-    emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+    submitButton.click();
     
+    // Wait for results (2.5 seconds)
     setTimeout(() => {
-      submitButton.click();
-      
-      setTimeout(() => {
-        // Check if account was found
-        const errorElement = document.querySelector('#identify_yourself_contact_point_error');
-        const found = !errorElement || errorElement.textContent.trim() === '';
-        
-        // Mark as used and track result
-        if (found) {
-          updateResults([number], [number]);
-        } else {
-          updateResults([number], []);
-        }
-        
-        // Process completed - but don't close the tab
-        finishProcess();
-      }, 2000);
-    }, 300);
-  }, 300);
+      checkResult(currentNumber);
+    }, delayTime);
+  }, 1000);
+}
+
+// Check if we found an ID
+function checkResult(number) {
+  // Look for success elements
+  const userLink = document.querySelector('a[href*="/user/"], a[href*="/profile.php"]');
+  const errorMessage = document.querySelector('#error_box');
   
-  // Function to update status
-  function updateStatus(message, isError = false) {
+  if (userLink) {
+    // Found a user
+    const userId = extractUserId(userLink.href);
+    updateStatus(`Tab ${tabIndex + 1}: Found ID ${userId} for ${number}`);
+    markNumberAsUsed(number, userId);
+    
+    // Continue with next number
+    setTimeout(() => processNext(), 1000);
+  } else if (errorMessage && errorMessage.textContent.includes('No search results')) {
+    // No user found - mark as used and continue
+    updateStatus(`Tab ${tabIndex + 1}: No user found for ${number}`);
+    markNumberAsUsed(number, 'not-found');
+    
+    // Continue with next number
+    setTimeout(() => processNext(), 1000);
+  } else {
+    // Try again after delay
+    setTimeout(() => {
+      checkResult(number);
+    }, 1000);
+  }
+}
+
+// Extract user ID from URL
+function extractUserId(url) {
+  const profileRegex = /profile\.php\?id=(\d+)/;
+  const userRegex = /\/user\/(\d+)/;
+  
+  let match = url.match(profileRegex);
+  if (match) return match[1];
+  
+  match = url.match(userRegex);
+  if (match) return match[1];
+  
+  return 'unknown';
+}
+
+// Mark number as used
+function markNumberAsUsed(number, id) {
+  chrome.runtime.sendMessage({
+    action: 'updateResults',
+    used: [number],
+    found: [{number, id}]
+  });
+  
+  // Schedule removal after 5 seconds
+  chrome.runtime.sendMessage({
+    action: 'scheduleNumberRemoval',
+    number: number
+  });
+}
+
+// Finish the process
+function finishProcess() {
+  if (isStopped) {
+    updateStatus(`Tab ${tabIndex + 1}: Process stopped`);
+  } else {
+    updateStatus(`Tab ${tabIndex + 1}: Process completed`);
+  }
+  
+  chrome.runtime.sendMessage({
+    action: 'processCompleted',
+    tabIndex: tabIndex
+  });
+}
+
+// Update status - Simplified to only show essential info
+function updateStatus(message, isError = false) {
+  // Only send essential status messages
+  const essentialMessages = [
+    'Checking',
+    'Found ID',
+    'No user found',
+    'Process completed',
+    'Process stopped'
+  ];
+  
+  const shouldSend = essentialMessages.some(keyword => message.includes(keyword));
+  
+  if (shouldSend) {
     chrome.runtime.sendMessage({
       action: 'updateStatus',
       message: message,
       isError: isError
     });
   }
-  
-  // Function to update results
-  function updateResults(used, found = []) {
-    chrome.runtime.sendMessage({
-      action: 'updateResults',
-      used: used,
-      found: found
-    });
-  }
-  
-  // Function to finish process
-  function finishProcess() {
-    if (isStopped) {
-      updateStatus('Process stopped', true);
-    } else {
-      updateStatus('Process completed - Tab remains open');
-    }
-    
-    chrome.runtime.sendMessage({
-      action: 'processCompleted'
-    });
-  }
-}
-
-// Check for phone number in URL when page loads
-if (window.location.href.includes('facebook.com/login/web/')) {
-  checkUrlForPhoneNumber();
 }
