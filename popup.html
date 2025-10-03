@@ -9,66 +9,56 @@
 <body>
   <div class="container">
     <div class="header">
-      <img src="icons/close.png" class="close-btn" id="closeToolBtn" alt="Close">
+      <button class="settings-btn" id="settingsBtn">
+        <img src="icons/settings.png" alt="Settings">
+      </button>
       <h3>📥 Find FB IDs</h3>
+      <div class="header-buttons">
+        <button id="closeBtn">
+          <img src="icons/close.png" alt="Close">
+        </button>
+      </div>
     </div>
     
+    <div id="settingsPanel" class="settings-panel">
+      <label for="tabCount">Number of Tabs:</label>
+      <input type="number" id="tabCount" min="1" max="20" value="5">
+      
+      <label for="delayTime">Delay between checks (ms):</label>
+      <input type="number" id="delayTime" min="1000" max="10000" value="2500">
+      
+      <button id="saveSettingsBtn">Save Settings</button>
+    </div>
+    
+    <textarea id="fbNumInput" placeholder="One per line or comma separated"></textarea>
+    
+    <div class="button-group">
+      <button id="fbStartTabsBtn">Start Tabs</button>
+      <button id="fbTryAllBtn">Try All</button>
+      <button id="fbStopBtn">Stop</button>
+    </div>
+    
+    <div class="button-group">
+      <button id="saveAllBtn">Save All</button>
+      <button id="removeAllBtn">Remove All</button>
+      <button id="reloadTabsBtn">🔃 Reload All Tabs</button>
+    </div>
+    
+    <div class="stats">
+      <div class="total">Total: <span id="totalCount">0</span></div>
+      <div class="used">Used: <span id="usedCount">0</span></div>
+    </div>
+    
+    <div id="messageBox" class="message-box"></div>
+    
+    <div id="fbStatus">Ready to start...</div>
+    
+    <!-- Notice Board from Google Doc -->
     <div id="noticeBoard" class="notice-board">
-      <div class="notice-content">Loading notice...</div>
-    </div>
-    
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="input">Input</button>
-      <button class="tab-btn" data-tab="settings">Settings</button>
-    </div>
-    
-    <div class="tab-content active" id="input-tab">
-      <div class="active-tabs">Active Tabs: <span id="activeTabCount">0</span>/<span id="maxTabsDisplay">5</span></div>
-      
-      <textarea id="fbNumInput" placeholder="One per line or comma separated. Double-click to remove numbers."></textarea>
-      
-      <div class="button-row top-row">
-        <button id="fbStartBtn" class="top-left-btn">Start</button>
-        <button id="saveAllBtn" class="top-right-btn">Save All</button>
-      </div>
-      
-      <div class="button-row bottom-row">
-        <button id="importBtn" class="bottom-left-btn">Import</button>
-        <button id="removeAllBtn" class="bottom-right-btn">Remove All</button>
-      </div>
-      
-      <div class="stats">
-        <div>Total: <span id="totalCount">0</span></div>
-        <div>Used: <span id="usedCount">0</span></div>
-      </div>
-      
-      <div id="fbStatus">Ready to start...</div>
-    </div>
-    
-    <div class="tab-content" id="settings-tab">
-      <div class="setting-item">
-        <label for="delayInput">Delay between checks (ms):</label>
-        <input type="number" id="delayInput" value="3000" min="1000" max="10000">
-      </div>
-      
-      <div class="setting-item">
-        <label for="maxTabs">Number of tabs to use (1-5):</label>
-        <input type="number" id="maxTabs" value="5" min="1" max="5">
-      </div>
-      
-      <div class="button-group">
-        <button id="saveSettingsBtn">Save Settings</button>
-      </div>
-      
-      <div id="settingsStatus" class="status-message"></div>
+      <h4>Notice Board:</h4>
+      <div id="noticeContent">Loading notice board...</div>
     </div>
   </div>
-  
-  <div class="stop-all-container">
-    <button id="stopAllBtn">Stop All</button>
-  </div>
-  
-  <input type="file" id="importFile" style="display: none" accept=".txt,.csv">
   
   <script src="popup.js"></script>
 </body>
