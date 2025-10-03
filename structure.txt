@@ -1,0 +1,13 @@
+facebook-id-finder/
+├── icons/
+│   ├── icon16.png
+│   ├── icon32.png
+│   ├── icon48.png
+│   ├── close.png
+│   └── settings.png
+├── popup.html
+├── popup.css
+├── popup.js
+├── content.js
+├── background.js
+└── manifest.json
